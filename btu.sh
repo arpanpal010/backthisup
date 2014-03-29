@@ -7,13 +7,16 @@
 #SERVER SETTINGS
 proto_ssh="blowfish";
 proto_ft="arcfour"; #rc4 insecure, find alternative streaming cypher
-#server
+
+#log
+logfile="/home/arch/bin/backthisup/btulogs";
+
+#server -> machine connected to storage
 serveraddr="192.168.1.2";
 serverunm="arch";
 serverbkppath="/media/xt1/BackThisUp"; #backup container in server
-#ssh/sftp id server
+#ssh/sftp server
 server=$serverunm"@"$serveraddr;
-logfile="/tmp/btulogs.txt"
 
 #CLIENT SETTINGS
 #set device
@@ -27,7 +30,7 @@ case $thisdevice in
 	devicebkppath="/home/BackThisUp"; #backup path on device
 ;;
 'laptop')
-	deviceaddr="192.168.1.9";
+	deviceaddr="192.168.1.3";
 	deviceunm="mint16";
 	bkppathdevice="/devices/xps15"; #backup path in server container
 	devicebkppath="/home/BackThisUp"; #backup path on device
@@ -36,6 +39,18 @@ case $thisdevice in
 	deviceaddr="192.168.1.4";
 	deviceunm="";
 	bkppathdevice="/devices/s2"; #backup path in server container
+	devicebkppath="/storage"; #backup path on device
+;;
+'pi')
+	deviceaddr="192.168.1.5";
+	deviceunm="pi";
+	bkppathdevice="/devices/rpi"; #backup path in server container
+	devicebkppath="/home/BackThisUp"; #backup path on device
+;;
+'m9')
+	deviceaddr="192.168.1.6";
+	deviceunm="";
+	bkppathdevice="/devices/m9"; #backup path in server container
 	devicebkppath="/storage"; #backup path on device
 ;;
 esac
@@ -108,9 +123,10 @@ fn_argparse(){
 #}
 #main file transfer fn here
 fn_transfer(){
+	fn_slog "tfr_$1_$2";
 	scp -r -c "$proto_ft" "$1" "$2";
 }
-#logging
+#logging @ server
 fn_slog(){
 	logline="$*";
 	fn_sexec "echo $logline >> $logfile"
@@ -149,22 +165,18 @@ then
 	exit;
 fi
 #help options
-if [ $# = 0 ];
+if [ ${#} = 0 ];
 then 
 	echo "No options specified.\n`fn_showhelp`";
 	exit;
 fi
-#argparse
-#fn_argparse "$@";
-#exit;
-
 #-----------------------------------------
 #Argument Parsing
 #-----------------------------------------
 while test ${#} -gt 0; #keep eating arguments till die :)
 do
 	case "$1" in
-#check if server is live ++ if ip given, ping that ip instead.
+#check if server / other machine is live
 	'--checkalive'|'-cl')
 		shift;
 		case "$1" in
@@ -185,15 +197,15 @@ do
 		esac
 	;;
 #generating keypair for public key authorization between client/server #no password YAY! 
-#needs PasswordAuthentication yes in /etc/ssh/sshd.conf
+#needs PasswordAuthentication yes in /etc/ssh/sshd.conf #ENABLE before / DISABLE after setting up keypairs
 	'--genkeypair'|'-g')
 		shift;
 		ssh-keygen -t rsa -N '' -f "/home/$USER/.ssh/id_rsa";
-		fn_transfer "/home/$USER/.ssh/id_rsa.pub" "$server:/tmp/";
-		fn_sexec 'cat /tmp/id_rsa.pub >> /home/$USER/.ssh/authorized_keys;'; # chmod 700 /home/$USER/.ssh; chmod 600 /home/$USER/.ssh/authorized_keys;';
+		fn_transfer "/home/$USER/.ssh/id_rsa.pub" "$server:/tmp/pubkey";
+		fn_sexec 'cat /tmp/pubkey >> /home/$USER/.ssh/authorized_keys;'; # chmod 700 /home/$USER/.ssh; chmod 600 /home/$USER/.ssh/authorized_keys;';
 		echo "Try logout/login if agent fails to sign with the credentials."
 	;;
-#ssh
+#ssh to server/other linux
 	'--ssh'|'-ssh')	
 		shift;
 		sship=$serverunm"@"$serveraddr; #defaults to server
