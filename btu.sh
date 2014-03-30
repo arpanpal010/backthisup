@@ -9,7 +9,7 @@ proto_ssh="blowfish";
 proto_ft="arcfour"; #rc4 insecure, find alternative streaming cypher
 
 #log
-logfile="/home/arch/bin/backthisup/btulogs";
+logfile="/tmp/btulogs";
 
 #server -> machine connected to storage
 serveraddr="192.168.1.2";
@@ -20,34 +20,34 @@ server=$serverunm"@"$serveraddr;
 
 #CLIENT SETTINGS
 #set device
-thisdevice="laptop";
+thisdevice='LAPTOP';
 #define devices here
 case $thisdevice in
-'desktop')
+'DESKTOP')
 	deviceaddr="192.168.1.2";
 	deviceunm="arch";
 	bkppathdevice="/devices/desktop"; #backup path in server container
 	devicebkppath="/home/BackThisUp"; #backup path on device
 ;;
-'laptop')
+'LAPTOP')
 	deviceaddr="192.168.1.3";
 	deviceunm="mint16";
 	bkppathdevice="/devices/xps15"; #backup path in server container
 	devicebkppath="/home/BackThisUp"; #backup path on device
 ;;
-'s2')
+'GALAXYS2')
 	deviceaddr="192.168.1.4";
 	deviceunm="";
 	bkppathdevice="/devices/s2"; #backup path in server container
 	devicebkppath="/storage"; #backup path on device
 ;;
-'pi')
+'RASPBERRY PI')
 	deviceaddr="192.168.1.5";
 	deviceunm="pi";
 	bkppathdevice="/devices/rpi"; #backup path in server container
 	devicebkppath="/home/BackThisUp"; #backup path on device
 ;;
-'m9')
+'PIPO M9')
 	deviceaddr="192.168.1.6";
 	deviceunm="";
 	bkppathdevice="/devices/m9"; #backup path in server container
@@ -112,7 +112,8 @@ fn_argparse(){
 		;;
 		esac;
 	done;
-	echo "$string";
+	echo "$string" > "/tmp/btu_args";
+	cat "/tmp/btu_args";
 }
 #shift
 #fn_shift(){
@@ -123,13 +124,24 @@ fn_argparse(){
 #}
 #main file transfer fn here
 fn_transfer(){
-	fn_slog "tfr_$1_$2";
+	fn_slog "TFR_$1_$2";
 	scp -r -c "$proto_ft" "$1" "$2";
 }
 #logging @ server
 fn_slog(){
 	logline="$*";
-	fn_sexec "echo $logline >> $logfile"
+	fn_sexec "echo `date -Ins`_$logline >> $logfile"
+}
+fn_showlog(){
+	fn_sexec "cat $logfile | tail";
+}
+#file exists test
+fn_existsindevice(){
+	echo `test -e "$1" && echo True || echo ''`;
+}
+fn_existsinserver(){
+	#echo `fn_sexec "test -e \"$1\" && echo True || echo False"`;
+	`fn_sexec "test -e \"$1\" && echo True || echo '' "`;
 }
 #help
 fn_showhelp(){
@@ -167,9 +179,13 @@ fi
 #help options
 if [ ${#} = 0 ];
 then 
+	fn_slog "NO-OPS"
 	echo "No options specified.\n`fn_showhelp`";
 	exit;
 fi
+#argparse
+#fn_argparse "$@";
+#exit;
 #-----------------------------------------
 #Argument Parsing
 #-----------------------------------------
@@ -181,28 +197,32 @@ do
 		shift;
 		case "$1" in
 		$serveraddr| '') #if none or server ip
-			echo "Pinging Server at $serveraddr"
-			ping -c 3 $serveraddr;
+			uip=$serveraddr;
 		;;
 		*\.*\.*\.*) #for any other ip
-			ping -c 3 "$1";
+			uip="$1";
 		;;
 		*\.*\.*) #for url passes anything.anything.anything
-			ping -c 3 "$1";
+			uip="$1";
 		;;
 		*) #default
 			echo "Usage: btu -cl <ip> | default ip: $serveraddr(server)";
 			exit;
 		;;
 		esac
+		echo "Pinging Server at $serveraddr"
+		fn_slog "PING_$uip";
+		ping -c 3 "$uip" 2>fn_slog;
 	;;
 #generating keypair for public key authorization between client/server #no password YAY! 
 #needs PasswordAuthentication yes in /etc/ssh/sshd.conf #ENABLE before / DISABLE after setting up keypairs
 	'--genkeypair'|'-g')
 		shift;
+		fn_slog "START_SSH_KEYGEN"
 		ssh-keygen -t rsa -N '' -f "/home/$USER/.ssh/id_rsa";
 		fn_transfer "/home/$USER/.ssh/id_rsa.pub" "$server:/tmp/pubkey";
 		fn_sexec 'cat /tmp/pubkey >> /home/$USER/.ssh/authorized_keys;'; # chmod 700 /home/$USER/.ssh; chmod 600 /home/$USER/.ssh/authorized_keys;';
+		fn_slog "KEY_EXCHANGE_SUCCESS"
 		echo "Try logout/login if agent fails to sign with the credentials."
 	;;
 #ssh to server/other linux
@@ -228,7 +248,9 @@ do
 			return;
 		esac
 		#echo $sship"|"$sshcomm;
-		ssh -c "$proto_ssh" "$sship" "$sshcomm";
+		fn_slog "BEGIN_SSH_SESSION_$sship"
+		ssh -c "$proto_ssh" "$sship" "$sshcomm" 2>fn_slog;
+		fn_slog "END_SSH_SESSION_$sship"
 		return;
 	;;
 #upload files
@@ -290,24 +312,6 @@ do
 			echo "src=$src\ndst=${dst%/*}"; #show src and dst #remove the last dirname otherwise path becomes dir/dir
 			scp -r -c "$proto_ft" "$src" "$server:${dst%/*}";
 		fi
-		#find "$src" | sort > /tmp/dfiles; #finding files in device
-		#ssh -c $proto_ssh $server "find $dst | sort" > /tmp/sfiles; #finding files in server
-		#dpath>spath in dfiles
-		#fn_getspath `cat /tmp/dfiles` > /tmp/dfiles_slocation; #converting dpaths to spaths for checking
-		#touch /tmp/dfiles_slocation;
-		#for line in `cat /tmp/dfiles`;
-		#do
-		#	echo "line="$line;
-		#	echo "converted="`fn_getspath "$line";`;
-		#	echo `fn_getspath "$line";` >> /tmp/dfiles_slocation;
-		#done;
-		#cat /tmp/dfiles;
-		#cat /tmp/sfiles;
-		#cat /tmp/dfiles_slocation;
-		#for line in $dfiles_slocation;
-		#do
-			#if line in 
-		#rm /tmp/dfiles_slocation;
 	;;
 #download & replace file structure at given filepath else $PWD
 	'--pull'|'-l') 
@@ -317,7 +321,7 @@ do
 		#if file/dir exists in device, replace $devicebkppath with $bkppathdevice and transfer else error
 		src=`fn_getspath "$dst"`;
 		#echo "src=$src\ndst=$dst"; #show src and dst
-		#basic pull service - replace ALL current content in device with old content in server
+		#basic pull service - replace ALL current content in device with last backup in server
 		#if file/dir exists in backup, replace $bkppathdevice with $devicebkppath and transfer else error
 		if [ -f "$dst" ];
 		then 
@@ -329,28 +333,46 @@ do
 		elif [ -d "$dst" ];
 		then 
 			echo "Deleting directory $dst";
-			rm -rf --preserve-root "$dst/*"; #save that directory in case its a shortlink
+			rm -rf --preserve-root "$dst/*"; #lel
 			echo "Copying file(s)..."
 			echo "src=$src\ndst=${dst%/*}"; #show src and dst #remove the last dirname otherwise path becomes dir/dir
 			scp -r -c "$proto_ft" "`fn_escape $server:$src`" "${dst%/*}";
 		fi
 	;;
-	'--syncup'|'-su')
+	'--syncup'|'-su') #direcctory sync, upload files that dont exist in server
 		shift;
 		src=`fn_getpath "$1"`;
-		filelist="";
-		files=`find "$src";`
-		echo $files
-		#for item in $files
-		#do 
-		#	#
-		#done;
-		for item in $filelist
-		do echo $item 
-		done
+		find "$src"|sort > "/tmp/btu_su_filelist";
+		while read line;
+		do
+			dst=`fn_getspath "$line"`;
+			echo "src=$line\ndst=$dst"; #show src and dst
+			if [ -f "$src" ];
+			then
+				if [ `fn_existsinserver "$dst"` ];
+				then
+					echo "File exists.";
+				else
+					echo "File not found."
+				fi
+			elif [ -d "$src" ];
+			then 
+				if [ `fn_existsinserver "$dst"` ];
+				then
+					echo "Dir exists.";
+				else
+					echo "Dir not found."
+				fi
+			fi
+		done < "/tmp/btu_su_filelist"
+		shift;
 	;;
 	'--help'|'-h') #show help
 		fn_showhelp;
+		shift;
+	;;
+	'--log') #show recent logs
+		fn_showlog;
 		shift;
 	;;
 	*) #no-arg, show options & exit #unused
