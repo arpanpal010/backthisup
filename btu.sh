@@ -9,7 +9,7 @@ proto_ssh="blowfish";
 proto_ft="arcfour"; #rc4 insecure, find alternative streaming cypher
 
 #log
-logfile="/tmp/btulogs";
+slogfile="/tmp/btulogs";
 
 #server -> machine connected to storage
 serveraddr="192.168.1.2";
@@ -33,7 +33,7 @@ case $thisdevice in
 	deviceaddr="192.168.1.3";
 	deviceunm="mint16";
 	bkppathdevice="/devices/xps15"; #backup path in server container
-	devicebkppath="/home/BackThisUp"; #backup path on device
+	devicebkppath="/home/arch"; #backup path on device
 ;;
 'GALAXYS2')
 	deviceaddr="192.168.1.4";
@@ -41,13 +41,13 @@ case $thisdevice in
 	bkppathdevice="/devices/s2"; #backup path in server container
 	devicebkppath="/storage"; #backup path on device
 ;;
-'RASPBERRY PI')
+'RASPBERRYPI')
 	deviceaddr="192.168.1.5";
 	deviceunm="pi";
 	bkppathdevice="/devices/rpi"; #backup path in server container
 	devicebkppath="/home/BackThisUp"; #backup path on device
 ;;
-'PIPO M9')
+'PIPOM9')
 	deviceaddr="192.168.1.6";
 	deviceunm="";
 	bkppathdevice="/devices/m9"; #backup path in server container
